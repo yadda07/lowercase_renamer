@@ -1,27 +1,39 @@
-CREATE OR REPLACE FUNCTION muliminirenom(schema_names text[])
-  RETURNS VOID AS
-$$
+CREATE OR REPLACE FUNCTION lowername_column(schema_names text[])
+  RETURNS void
+  LANGUAGE plpgsql
+AS $$
 DECLARE
-  r record;
-  col_name text;
-  schema_name text;
+  current_schema_name text;
+  current_table_name text;
+  current_col_name text;
 BEGIN
-  FOREACH schema_name IN ARRAY schema_names LOOP
-    FOR r IN (SELECT table_name FROM information_schema.tables WHERE table_schema = schema_name) LOOP
-      FOR col_name IN (SELECT column_name FROM information_schema.columns WHERE table_schema = schema_name AND table_name = r.table_name) LOOP
-        IF col_name <> lower(col_name) THEN
-          EXECUTE format(
-            'SELECT column_name FROM information_schema.columns WHERE table_schema = %L AND table_name = %L AND column_name = %L',
-            schema_name, r.table_name, col_name) INTO col_name;
+  FOREACH current_schema_name IN ARRAY schema_names LOOP
+    FOR current_table_name IN
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = current_schema_name
+        AND table_type = 'BASE TABLE'
+    LOOP
+      FOR current_col_name IN
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema_name
+          AND table_name = current_table_name
+      LOOP
+        IF current_col_name <> lower(current_col_name) THEN
           EXECUTE format(
             'ALTER TABLE %I.%I RENAME COLUMN %I TO %I',
-            schema_name, r.table_name, col_name, lower(col_name));
+            current_schema_name,
+            current_table_name,
+            current_col_name,
+            lower(current_col_name)
+          );
         END IF;
       END LOOP;
     END LOOP;
   END LOOP;
 END;
-$$
-LANGUAGE plpgsql;
+$$;
 
-SELECT muliminirenom(array['dsp_corsicathd','dsp_rochelle'])
+-- Example:
+-- SELECT lowername_column(ARRAY['public', 'gis']);
